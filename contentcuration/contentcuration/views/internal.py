@@ -38,6 +38,7 @@ from contentcuration.models import get_next_sort_order
 from contentcuration.models import License
 from contentcuration.models import SlideshowSlide
 from contentcuration.models import StagedFile
+from contentcuration.permissions import user_can_edit
 from contentcuration.serializers import GetTreeDataSerizlizer
 from contentcuration.utils.files import get_file_diff
 from contentcuration.utils.garbage_collect import get_deleted_chefs_root
@@ -251,13 +252,16 @@ def api_publish_channel(request):
 
     try:
         channel_id = data["channel_id"]
+        channel = Channel.objects.get(id=channel_id)
+        if not user_can_edit(request.user, channel):
+            raise PermissionDenied("User does not have permissions to edit channel")
         call_command("exportchannel", channel_id, user_id=request.user.pk)
 
         return JsonResponse({
             "success": True,
             "channel": channel_id
         })
-    except (KeyError, Channel.DoesNotExist):
+    except (KeyError, Channel.DoesNotExist, PermissionDenied):
         return HttpResponseNotFound("No channel matching: {}".format(data))
     except Exception as e:
         handle_server_error(request)
