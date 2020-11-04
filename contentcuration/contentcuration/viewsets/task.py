@@ -19,8 +19,8 @@ class TaskFilter(RequiredFilterSet):
     channel = UUIDFilter(method="filter_channel")
 
     def filter_channel(self, queryset, name, value):
-        user_id = not self.request.user.is_anonymous() and self.request.user.id
-        user_email = not self.request.user.is_anonymous() and self.request.user.email
+        user_id = not self.request.user.is_anonymous and self.request.user.id
+        user_email = not self.request.user.is_anonymous and self.request.user.email
         user_queryset = User.objects.filter(id=user_id)
         channel_queryset = Channel.objects.annotate(
             edit=Exists(user_queryset.filter(editable_channels=OuterRef("id"))),
@@ -50,7 +50,7 @@ class TaskViewSet(ReadOnlyValuesViewset, DestroyModelMixin):
     queryset = Task.objects.all()
     permission_classes = [IsAuthenticated]
     filter_backends = (DjangoFilterBackend,)
-    filter_class = TaskFilter
+    filterset_class = TaskFilter
     lookup_field = "task_id"
 
     values = (

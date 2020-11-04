@@ -1,9 +1,3 @@
-from future import standard_library
-standard_library.install_aliases()
-from builtins import zip
-from builtins import filter
-from builtins import str
-from builtins import range
 import functools
 import hashlib
 import json
@@ -32,18 +26,19 @@ from django.db import IntegrityError
 from django.db import models
 from django.db.models import Count
 from django.db.models import Exists
+from django.db.models import IntegerField
 from django.db.models import Max
 from django.db.models import OuterRef
 from django.db.models import Q
-from django.db.models import Sum
 from django.db.models import Subquery
+from django.db.models import Sum
 from django.db.models import Value
+from django.db.models.functions import Cast
 from django.db.models.query_utils import DeferredAttribute
 from django.dispatch import receiver
 from django.utils import timezone
 from django.utils.translation import ugettext as _
 from django_cte import With
-from model_utils import FieldTracker
 from le_utils import proquint
 from le_utils.constants import content_kinds
 from le_utils.constants import exercises
@@ -51,16 +46,17 @@ from le_utils.constants import file_formats
 from le_utils.constants import format_presets
 from le_utils.constants import languages
 from le_utils.constants import roles
+from model_utils import FieldTracker
 from mptt.models import MPTTModel
 from mptt.models import raise_if_unsaved
 from mptt.models import TreeForeignKey
 from rest_framework.authtoken.models import Token
 
 from contentcuration.db.models.expressions import Array
-from contentcuration.db.models.functions import Unnest
 from contentcuration.db.models.functions import ArrayRemove
-from contentcuration.db.models.manager import CustomManager
+from contentcuration.db.models.functions import Unnest
 from contentcuration.db.models.manager import CustomContentNodeTreeManager
+from contentcuration.db.models.manager import CustomManager
 from contentcuration.statistics import record_channel_stats
 from contentcuration.utils.cache import delete_public_channel_cache_keys
 from contentcuration.utils.parser import load_json_string
@@ -123,7 +119,7 @@ class User(AbstractBaseUser, PermissionsMixin):
     is_staff = models.BooleanField('staff status', default=False,
                                    help_text='Designates whether the user can log into this admin site.')
     date_joined = models.DateTimeField('date joined', default=timezone.now)
-    clipboard_tree = models.ForeignKey('ContentNode', null=True, blank=True, related_name='user_clipboard')
+    clipboard_tree = models.ForeignKey('ContentNode', null=True, blank=True, related_name='user_clipboard', on_delete=models.SET_NULL)
     preferences = models.TextField(default=DEFAULT_USER_PREFERENCES)
     disk_space = models.FloatField(default=524288000, help_text='How many bytes a user can upload')
     disk_space_used = models.FloatField(default=0, help_text='How many bytes a user has uploaded')
@@ -398,7 +394,7 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     @classmethod
     def filter_view_queryset(cls, queryset, user):
-        if user.is_anonymous():
+        if user.is_anonymous:
             return queryset.none()
         channel_list = Channel.objects.filter(
             Q(
@@ -724,13 +720,13 @@ class Channel(models.Model):
         help_text="Users with view only rights",
         blank=True,
     )
-    language = models.ForeignKey('Language', null=True, blank=True, related_name='channel_language')
-    trash_tree = models.ForeignKey('ContentNode', null=True, blank=True, related_name='channel_trash')
-    clipboard_tree = models.ForeignKey('ContentNode', null=True, blank=True, related_name='channel_clipboard')
-    main_tree = models.ForeignKey('ContentNode', null=True, blank=True, related_name='channel_main')
-    staging_tree = models.ForeignKey('ContentNode', null=True, blank=True, related_name='channel_staging')
-    chef_tree = models.ForeignKey('ContentNode', null=True, blank=True, related_name='channel_chef')
-    previous_tree = models.ForeignKey('ContentNode', null=True, blank=True, related_name='channel_previous')
+    language = models.ForeignKey('Language', null=True, blank=True, related_name='channel_language', on_delete=models.SET_NULL)
+    trash_tree = models.ForeignKey('ContentNode', null=True, blank=True, related_name='channel_trash', on_delete=models.SET_NULL)
+    clipboard_tree = models.ForeignKey('ContentNode', null=True, blank=True, related_name='channel_clipboard', on_delete=models.SET_NULL)
+    main_tree = models.ForeignKey('ContentNode', null=True, blank=True, related_name='channel_main', on_delete=models.SET_NULL)
+    staging_tree = models.ForeignKey('ContentNode', null=True, blank=True, related_name='channel_staging', on_delete=models.SET_NULL)
+    chef_tree = models.ForeignKey('ContentNode', null=True, blank=True, related_name='channel_chef', on_delete=models.SET_NULL)
+    previous_tree = models.ForeignKey('ContentNode', null=True, blank=True, related_name='channel_previous', on_delete=models.SET_NULL)
     bookmarked_by = models.ManyToManyField(
         settings.AUTH_USER_MODEL,
         related_name='bookmarked_channels',
@@ -787,7 +783,7 @@ class Channel(models.Model):
 
     @classmethod
     def filter_edit_queryset(cls, queryset, user):
-        user_id = not user.is_anonymous() and user.id
+        user_id = not user.is_anonymous and user.id
 
         # it won't return anything
         if not user_id:
@@ -798,8 +794,8 @@ class Channel(models.Model):
 
     @classmethod
     def filter_view_queryset(cls, queryset, user):
-        user_id = not user.is_anonymous() and user.id
-        user_email = not user.is_anonymous() and user.email
+        user_id = not user.is_anonymous and user.id
+        user_email = not user.is_anonymous and user.email
 
         if user_id:
             filters = dict(user_id=user_id, channel_id=OuterRef("id"))
@@ -1014,9 +1010,9 @@ class ChannelSet(models.Model):
 
     @classmethod
     def filter_edit_queryset(cls, queryset, user):
-        if user.is_anonymous():
+        if user.is_anonymous:
             return queryset.none()
-        user_id = not user.is_anonymous() and user.id
+        user_id = not user.is_anonymous and user.id
         edit = Exists(User.channel_sets.through.objects.filter(user_id=user_id, channelset_id=OuterRef("id")))
         return queryset.annotate(edit=edit).filter(edit=True)
 
@@ -1131,15 +1127,15 @@ class ContentNode(MPTTModel, models.Model):
 
     title = models.CharField(max_length=200, blank=True)
     description = models.TextField(blank=True)
-    kind = models.ForeignKey('ContentKind', related_name='contentnodes', db_index=True)
-    license = models.ForeignKey('License', null=True, blank=True)
+    kind = models.ForeignKey('ContentKind', related_name='contentnodes', db_index=True, null=True, blank=True, on_delete=models.SET_NULL)
+    license = models.ForeignKey('License', null=True, blank=True, on_delete=models.SET_NULL)
     license_description = models.CharField(max_length=400, null=True, blank=True)
     prerequisite = models.ManyToManyField('self', related_name='is_prerequisite_of',
                                           through='PrerequisiteContentRelationship', symmetrical=False, blank=True)
     is_related = models.ManyToManyField('self', related_name='relate_to', through='RelatedContentRelationship',
                                         symmetrical=False, blank=True)
-    language = models.ForeignKey('Language', null=True, blank=True, related_name='content_language')
-    parent = TreeForeignKey('self', null=True, blank=True, related_name='children', db_index=True)
+    language = models.ForeignKey('Language', null=True, blank=True, related_name='content_language', on_delete=models.SET_NULL)
+    parent = TreeForeignKey('self', null=True, blank=True, related_name='children', db_index=True, on_delete=models.CASCADE)
     tags = models.ManyToManyField(ContentTag, symmetrical=False, related_name='tagged_content', blank=True)
     # No longer used
     sort_order = models.FloatField(max_length=50, default=1, verbose_name="sort order",
@@ -1198,13 +1194,15 @@ class ContentNode(MPTTModel, models.Model):
 
     @classmethod
     def _orphan_tree_id_subquery(cls):
-        return cls.objects.filter(
+        # For some reason this now requires an explicit type cast
+        # or it gets interpreted as a varchar
+        return Cast(cls.objects.filter(
             pk=settings.ORPHANAGE_ROOT_ID
-        ).values_list("tree_id", flat=True)[:1]
+        ).values_list("tree_id", flat=True)[:1], output_field=IntegerField())
 
     @classmethod
     def filter_edit_queryset(cls, queryset, user=None, user_id=None):
-        user_id = user_id or not user.is_anonymous() and user.id
+        user_id = user_id or not user.is_anonymous and user.id
 
         queryset = queryset.exclude(pk=settings.ORPHANAGE_ROOT_ID)
 
@@ -1219,7 +1217,7 @@ class ContentNode(MPTTModel, models.Model):
 
     @classmethod
     def filter_view_queryset(cls, queryset, user):
-        user_id = not user.is_anonymous() and user.id
+        user_id = not user.is_anonymous and user.id
 
         queryset = queryset.annotate(
             public=Exists(
@@ -1636,7 +1634,7 @@ class FormatPreset(models.Model):
     subtitle = models.BooleanField(default=False)
     display = models.BooleanField(default=True)  # Render on client side
     order = models.IntegerField(default=0)
-    kind = models.ForeignKey(ContentKind, related_name='format_presets', null=True)
+    kind = models.ForeignKey(ContentKind, related_name='format_presets', null=True, on_delete=models.SET_NULL)
     allowed_formats = models.ManyToManyField(FileFormat, blank=True)
 
     def __str__(self):
@@ -1697,7 +1695,7 @@ class AssessmentItem(models.Model):
     answers = models.TextField(default="[]")
     order = models.IntegerField(default=1)
     contentnode = models.ForeignKey('ContentNode', related_name="assessment_items", blank=True, null=True,
-                                    db_index=True)
+                                    db_index=True, on_delete=models.CASCADE)
     # Note this field is indexed, but we are using the Index API to give it an explicit name, see the model Meta
     assessment_id = UUIDField(primary_key=False, default=uuid.uuid4, editable=False)
     raw_data = models.TextField(blank=True)
@@ -1721,7 +1719,7 @@ class AssessmentItem(models.Model):
 
     @classmethod
     def filter_edit_queryset(cls, queryset, user):
-        user_id = not user.is_anonymous() and user.id
+        user_id = not user.is_anonymous and user.id
 
         if not user_id:
             return queryset.none()
@@ -1734,7 +1732,7 @@ class AssessmentItem(models.Model):
 
     @classmethod
     def filter_view_queryset(cls, queryset, user):
-        user_id = not user.is_anonymous() and user.id
+        user_id = not user.is_anonymous and user.id
 
         queryset = queryset.annotate(
             public=Exists(
@@ -1760,9 +1758,9 @@ class AssessmentItem(models.Model):
 
 class SlideshowSlide(models.Model):
     contentnode = models.ForeignKey('ContentNode', related_name="slideshow_slides", blank=True, null=True,
-                                    db_index=True)
+                                    db_index=True, on_delete=models.CASCADE)
     sort_order = models.FloatField(default=1.0)
-    metadata = JSONField(default={})
+    metadata = JSONField(default=dict)
 
 
 class StagedFile(models.Model):
@@ -1771,7 +1769,7 @@ class StagedFile(models.Model):
     """
     checksum = models.CharField(max_length=400, blank=True, db_index=True)
     file_size = models.IntegerField(blank=True, null=True)
-    uploaded_by = models.ForeignKey(User, related_name='staged_files', blank=True, null=True)
+    uploaded_by = models.ForeignKey(User, related_name='staged_files', blank=True, null=True, on_delete=models.CASCADE)
 
 
 FILE_DISTINCT_INDEX_NAME = "file_checksum_file_size_idx"
@@ -1787,15 +1785,15 @@ class File(models.Model):
     file_size = models.IntegerField(blank=True, null=True)
     file_on_disk = models.FileField(upload_to=object_storage_name, storage=default_storage, max_length=500,
                                     blank=True)
-    contentnode = models.ForeignKey(ContentNode, related_name='files', blank=True, null=True, db_index=True)
-    assessment_item = models.ForeignKey(AssessmentItem, related_name='files', blank=True, null=True, db_index=True)
-    slideshow_slide = models.ForeignKey(SlideshowSlide, related_name='files', blank=True, null=True, db_index=True)
-    file_format = models.ForeignKey(FileFormat, related_name='files', blank=True, null=True, db_index=True)
-    preset = models.ForeignKey(FormatPreset, related_name='files', blank=True, null=True, db_index=True)
-    language = models.ForeignKey(Language, related_name='files', blank=True, null=True)
+    contentnode = models.ForeignKey(ContentNode, related_name='files', blank=True, null=True, db_index=True, on_delete=models.CASCADE)
+    assessment_item = models.ForeignKey(AssessmentItem, related_name='files', blank=True, null=True, db_index=True, on_delete=models.CASCADE)
+    slideshow_slide = models.ForeignKey(SlideshowSlide, related_name='files', blank=True, null=True, db_index=True, on_delete=models.CASCADE)
+    file_format = models.ForeignKey(FileFormat, related_name='files', blank=True, null=True, db_index=True, on_delete=models.SET_NULL)
+    preset = models.ForeignKey(FormatPreset, related_name='files', blank=True, null=True, db_index=True, on_delete=models.SET_NULL)
+    language = models.ForeignKey(Language, related_name='files', blank=True, null=True, on_delete=models.SET_NULL)
     original_filename = models.CharField(max_length=255, blank=True)
     source_url = models.CharField(max_length=400, blank=True, null=True)
-    uploaded_by = models.ForeignKey(User, related_name='files', blank=True, null=True)
+    uploaded_by = models.ForeignKey(User, related_name='files', blank=True, null=True, on_delete=models.SET_NULL)
 
     objects = CustomManager()
 
@@ -1803,7 +1801,7 @@ class File(models.Model):
 
     @classmethod
     def filter_edit_queryset(cls, queryset, user):
-        user_id = not user.is_anonymous() and user.id
+        user_id = not user.is_anonymous and user.id
 
         if not user_id:
             return queryset.none()
@@ -1815,7 +1813,7 @@ class File(models.Model):
 
     @classmethod
     def filter_view_queryset(cls, queryset, user):
-        user_id = not user.is_anonymous() and user.id
+        user_id = not user.is_anonymous and user.id
 
         queryset = queryset.annotate(
             public=Exists(
@@ -1924,8 +1922,8 @@ class PrerequisiteContentRelationship(models.Model):
     """
     Predefine the prerequisite relationship between two ContentNode objects.
     """
-    target_node = models.ForeignKey(ContentNode, related_name='%(app_label)s_%(class)s_target_node')
-    prerequisite = models.ForeignKey(ContentNode, related_name='%(app_label)s_%(class)s_prerequisite')
+    target_node = models.ForeignKey(ContentNode, related_name='%(app_label)s_%(class)s_target_node', on_delete=models.CASCADE)
+    prerequisite = models.ForeignKey(ContentNode, related_name='%(app_label)s_%(class)s_prerequisite', on_delete=models.CASCADE)
 
     class Meta:
         unique_together = ['target_node', 'prerequisite']
@@ -1957,8 +1955,8 @@ class RelatedContentRelationship(models.Model):
     """
     Predefine the related relationship between two ContentNode objects.
     """
-    contentnode_1 = models.ForeignKey(ContentNode, related_name='%(app_label)s_%(class)s_1')
-    contentnode_2 = models.ForeignKey(ContentNode, related_name='%(app_label)s_%(class)s_2')
+    contentnode_1 = models.ForeignKey(ContentNode, related_name='%(app_label)s_%(class)s_1', on_delete=models.CASCADE)
+    contentnode_2 = models.ForeignKey(ContentNode, related_name='%(app_label)s_%(class)s_2', on_delete=models.CASCADE)
 
     class Meta:
         unique_together = ['contentnode_1', 'contentnode_2']
@@ -1975,7 +1973,7 @@ class RelatedContentRelationship(models.Model):
 
 
 class Exercise(models.Model):
-    contentnode = models.ForeignKey('ContentNode', related_name="exercise", null=True)
+    contentnode = models.ForeignKey('ContentNode', related_name="exercise", null=True, on_delete=models.CASCADE)
     mastery_model = models.CharField(max_length=200, default=exercises.DO_ALL, choices=exercises.MASTERY_MODELS)
 
 
@@ -2008,7 +2006,7 @@ class Invitation(models.Model):
 
     @classmethod
     def filter_edit_queryset(cls, queryset, user):
-        if user.is_anonymous():
+        if user.is_anonymous:
             return queryset.none()
 
         return queryset.filter(
@@ -2019,7 +2017,7 @@ class Invitation(models.Model):
 
     @classmethod
     def filter_view_queryset(cls, queryset, user):
-        if user.is_anonymous():
+        if user.is_anonymous:
             return queryset.none()
 
         return queryset.filter(
@@ -2037,5 +2035,5 @@ class Task(models.Model):
     created = models.DateTimeField(default=timezone.now)
     status = models.CharField(max_length=10)
     is_progress_tracking = models.BooleanField(default=False)
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="task")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, related_name="task", on_delete=models.CASCADE)
     metadata = JSONField()

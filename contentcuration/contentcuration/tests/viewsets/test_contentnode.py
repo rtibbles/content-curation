@@ -5,9 +5,9 @@ import uuid
 import pytest
 from django.conf import settings
 from django.core.management import call_command
-from django.core.urlresolvers import reverse
 from django.db.utils import OperationalError
 from django.test.testcases import TransactionTestCase
+from django.urls import reverse
 from django_concurrent_tests.errors import WrappedError
 from django_concurrent_tests.helpers import call_concurrently
 from django_concurrent_tests.helpers import make_concurrent_calls
@@ -1201,6 +1201,18 @@ class CRUDTestCase(StudioAPITestCase):
         )
         self.assertEqual(response.status_code, 200, response.content)
         self.assertEqual(response.data["id"], contentnode.id)
+
+    def test_fetch_contentnode_ancestors(self):
+        user = testdata.user()
+        self.client.force_authenticate(user=user)
+        contentnode = models.ContentNode.objects.create(**self.contentnode_db_metadata)
+        response = self.client.get(
+            reverse("contentnode-list"),
+            {"ancestors_of": contentnode.id},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+        self.assertEqual(response.data[0]["id"], contentnode.id)
 
     def test_fetch_requisites(self):
         user = testdata.user()

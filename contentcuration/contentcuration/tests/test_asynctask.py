@@ -4,7 +4,7 @@ import uuid
 from builtins import range
 from builtins import str
 
-from django.core.urlresolvers import reverse
+from django.urls import reverse
 
 from .base import BaseAPITestCase
 from contentcuration.models import ContentNode
@@ -88,7 +88,7 @@ class AsyncTaskTestCase(BaseAPITestCase):
 
         url = "{}?channel={}".format(reverse("task-list"), task_info.id)
         response = self.get(url)
-        self.assertEqual(response.status_code, 412)
+        self.assertEqual(response.status_code, 400)
 
     def test_asynctask_reports_error(self):
         """

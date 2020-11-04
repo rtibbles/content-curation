@@ -5,10 +5,12 @@ from django.conf import settings
 from django.db import IntegrityError
 from django.db.models import Exists
 from django.db.models import F
+from django.db.models import IntegerField as DjangoIntegerField
 from django.db.models import OuterRef
 from django.db.models import Q
 from django.db.models import Subquery
 from django.db.models.functions import Coalesce
+from django.db.models.functions import Cast
 from django.http import Http404
 from django.utils.timezone import now
 from django_filters.rest_framework import CharFilter
@@ -17,7 +19,7 @@ from django_filters.rest_framework import UUIDFilter
 from le_utils.constants import content_kinds
 from le_utils.constants import exercises
 from le_utils.constants import roles
-from rest_framework.decorators import detail_route
+from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.serializers import ChoiceField
@@ -60,10 +62,10 @@ _valid_positions = {"first-child", "last-child", "left", "right"}
 
 
 class ContentNodeFilter(RequiredFilterSet):
-    id__in = UUIDInFilter(name="id")
+    id__in = UUIDInFilter(field_name="id")
     root_id = UUIDFilter(method="filter_root_id")
     ancestors_of = UUIDFilter(method="filter_ancestors_of")
-    parent__in = UUIDInFilter(name="parent")
+    parent__in = UUIDInFilter(field_name="parent")
     _node_id_channel_id___in = CharFilter(method="filter__node_id_channel_id")
 
     class Meta:
@@ -89,7 +91,10 @@ class ContentNodeFilter(RequiredFilterSet):
         # For simplicity include the target node in the query
         target_node_query = ContentNode.objects.filter(pk=value)
         return queryset.filter(
-            tree_id=target_node_query.values_list("tree_id", flat=True)[:1],
+            tree_id=Cast(
+                target_node_query.values_list("tree_id", flat=True)[:1],
+                output_field=DjangoIntegerField(),
+            ),
             lft__lte=target_node_query.values_list("lft", flat=True)[:1],
             rght__gte=target_node_query.values_list("rght", flat=True)[:1],
         )
@@ -457,7 +462,7 @@ class ContentNodeViewSet(BulkUpdateMixin, ValuesViewset):
     serializer_class = ContentNodeSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = (DjangoFilterBackend,)
-    filter_class = ContentNodeFilter
+    filterset_class = ContentNodeFilter
     values = (
         "id",
         "content_id",
@@ -524,7 +529,7 @@ class ContentNodeViewSet(BulkUpdateMixin, ValuesViewset):
         queryset = super(ContentNodeViewSet, self).get_edit_queryset()
         return self._annotate_channel_id(queryset)
 
-    @detail_route(methods=["get"])
+    @action(detail=True, methods=["get"])
     def requisites(self, request, pk=None):
         if not pk:
             raise Http404
@@ -538,9 +543,10 @@ class ContentNodeViewSet(BulkUpdateMixin, ValuesViewset):
         # Do a filter just on the tree_id of the target node, as relationships
         # should not be cross channel, and are not meaningful if they are.
         prereq_table_entries = PrerequisiteContentRelationship.objects.filter(
-            target_node__tree_id=ContentNode.objects.filter(pk=pk).values_list(
-                "tree_id", flat=True
-            )[:1]
+            target_node__tree_id=Cast(
+                ContentNode.objects.filter(pk=pk).values_list("tree_id", flat=True)[:1],
+                output_field=DjangoIntegerField(),
+            )
         ).values("target_node_id", "prerequisite_id")
 
         return Response(
@@ -587,8 +593,16 @@ class ContentNodeViewSet(BulkUpdateMixin, ValuesViewset):
             contentnode=OuterRef("id"), preset__thumbnail=True
         )
         original_channel_name = Coalesce(
-            Subquery(Channel.objects.filter(pk=OuterRef("original_channel_id")).values("name")[:1]),
-            Subquery(Channel.objects.filter(main_tree__tree_id=OuterRef("tree_id")).values("name")[:1]),
+            Subquery(
+                Channel.objects.filter(pk=OuterRef("original_channel_id")).values(
+                    "name"
+                )[:1]
+            ),
+            Subquery(
+                Channel.objects.filter(main_tree__tree_id=OuterRef("tree_id")).values(
+                    "name"
+                )[:1]
+            ),
         )
         original_node = ContentNode.objects.filter(
             node_id=OuterRef("original_source_node_id")
@@ -623,7 +637,6 @@ class ContentNodeViewSet(BulkUpdateMixin, ValuesViewset):
             ),
             original_channel_name=original_channel_name,
             original_parent_id=Subquery(original_node.values("parent_id")[:1]),
-            original_node_id=Subquery(original_node.values("pk")[:1]),
             has_children=Exists(
                 ContentNode.objects.filter(parent=OuterRef("id")).values("pk")
             ),

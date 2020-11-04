@@ -15,7 +15,7 @@ from django_filters.rest_framework import BooleanFilter
 from django_filters.rest_framework import CharFilter
 from django_filters.rest_framework import DjangoFilterBackend
 from django_filters.rest_framework import FilterSet
-from rest_framework.decorators import list_route
+from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAdminUser
@@ -77,8 +77,7 @@ class UserFilter(FilterSet):
             can_edit=Cast(
                 Cast(
                     SQCount(
-                        channel_queryset.filter(editors=OuterRef("id")),
-                        field="id",
+                        channel_queryset.filter(editors=OuterRef("id")), field="id",
                     ),
                     IntegerField(),
                 ),
@@ -87,8 +86,7 @@ class UserFilter(FilterSet):
             can_view=Cast(
                 Cast(
                     SQCount(
-                        channel_queryset.filter(viewers=OuterRef("id")),
-                        field="id",
+                        channel_queryset.filter(viewers=OuterRef("id")), field="id",
                     ),
                     IntegerField(),
                 ),
@@ -123,7 +121,7 @@ class UserViewSet(ReadOnlyValuesViewset):
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = (DjangoFilterBackend,)
-    filter_class = UserFilter
+    filterset_class = UserFilter
     values = (
         "id",
         "email",
@@ -138,11 +136,11 @@ class UserViewSet(ReadOnlyValuesViewset):
         "view_only_channels": "view_only_channels__ids",
     }
 
-    @list_route(methods=["get"])
+    @action(detail=False, methods=["get"])
     def get_storage_used(self, request):
         return Response(request.user.disk_space_used)
 
-    @list_route(methods=["get"])
+    @action(detail=False, methods=["get"])
     def refresh_storage_used(self, request):
         return Response(request.user.set_space_used())
 
@@ -177,7 +175,7 @@ class ChannelUserViewSet(ReadOnlyValuesViewset):
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = (DjangoFilterBackend,)
-    filter_class = ChannelUserFilter
+    filterset_class = ChannelUserFilter
     values = (
         "id",
         "email",
@@ -316,10 +314,8 @@ class AdminUserFilter(FilterSet):
 class AdminUserViewSet(UserViewSet):
     pagination_class = UserListPagination
     permission_classes = [IsAdminUser]
-    filter_class = AdminUserFilter
-    filter_backends = (
-        DjangoFilterBackend,
-    )
+    filterset_class = AdminUserFilter
+    filter_backends = (DjangoFilterBackend,)
     base_values = (
         "id",
         "email",

@@ -15,7 +15,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 from le_utils.constants import content_kinds
 from le_utils.constants import roles
 from rest_framework import serializers
-from rest_framework.decorators import detail_route
+from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import AllowAny
 from rest_framework.permissions import IsAdminUser
@@ -79,8 +79,8 @@ base_channel_filter_fields = (
 
 
 class BaseChannelFilter(RequiredFilterSet):
-    published = BooleanFilter(name="main_tree__published")
-    id__in = UUIDInFilter(name="id")
+    published = BooleanFilter(field_name="main_tree__published")
+    id__in = UUIDInFilter(field_name="id")
     keywords = CharFilter(method="filter_keywords")
     languages = CharFilter(method="filter_languages")
     licenses = CharFilter(method="filter_licenses")
@@ -93,7 +93,7 @@ class BaseChannelFilter(RequiredFilterSet):
     staged = BooleanFilter(method="filter_staged")
     public = BooleanFilter(method="filter_public")
     cheffed = BooleanFilter(method="filter_cheffed")
-    exclude = CharFilter(name="id", method="filter_excluded_id")
+    exclude = CharFilter(field_name="id", method="filter_excluded_id")
 
     def __init__(self, *args, **kwargs):
         super(BaseChannelFilter, self).__init__(*args, **kwargs)
@@ -216,11 +216,7 @@ class ChannelFilter(BaseChannelFilter):
 
     class Meta:
         model = Channel
-        fields = base_channel_filter_fields + (
-            "bookmark",
-            "edit",
-            "view",
-        )
+        fields = base_channel_filter_fields + ("bookmark", "edit", "view",)
 
 
 class ChannelSerializer(BulkModelSerializer):
@@ -372,14 +368,14 @@ class ChannelViewSet(ValuesViewset):
     serializer_class = ChannelSerializer
     filter_backends = (DjangoFilterBackend,)
     pagination_class = CatalogListPagination
-    filter_class = ChannelFilter
+    filterset_class = ChannelFilter
 
     field_map = channel_field_map
     values = base_channel_values + ("edit", "view", "bookmark")
 
     def get_queryset(self):
         queryset = super(ChannelViewSet, self).get_queryset()
-        user_id = not self.request.user.is_anonymous() and self.request.user.id
+        user_id = not self.request.user.is_anonymous and self.request.user.id
         user_queryset = User.objects.filter(id=user_id)
 
         return queryset.annotate(
@@ -412,7 +408,7 @@ class ChannelViewSet(ValuesViewset):
         )
         return queryset
 
-    @detail_route(methods=["post"])
+    @action(detail=True, methods=["post"])
     def publish(self, request, pk=None):
         if not pk:
             raise Http404
@@ -441,7 +437,7 @@ class ChannelViewSet(ValuesViewset):
         create_async_task("export-channel", request.user, **task_args)
         return Response("")
 
-    @detail_route(methods=["post"])
+    @action(detail=True, methods=["post"])
     def sync(self, request, pk=None):
         if not pk:
             raise Http404
@@ -489,7 +485,7 @@ class CatalogViewSet(ReadOnlyValuesViewset):
     serializer_class = ChannelSerializer
     filter_backends = (DjangoFilterBackend,)
     pagination_class = CatalogListPagination
-    filter_class = BaseChannelFilter
+    filterset_class = BaseChannelFilter
 
     permission_classes = [AllowAny]
 
@@ -564,10 +560,8 @@ class AdminChannelFilter(BaseChannelFilter):
 class AdminChannelViewSet(ChannelViewSet):
     pagination_class = CatalogListPagination
     permission_classes = [IsAdminUser]
-    filter_class = AdminChannelFilter
-    filter_backends = (
-        DjangoFilterBackend,
-    )
+    filterset_class = AdminChannelFilter
+    filter_backends = (DjangoFilterBackend,)
     field_map = {
         "published": "main_tree__published",
         "created": "main_tree__created",
