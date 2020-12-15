@@ -12,7 +12,7 @@ from django.core.exceptions import SuspiciousOperation
 from django.core.files.storage import default_storage
 from django.db.models import Count
 from django.db.models import Sum
-from django.utils.translation import ugettext as _
+from django.utils.translation import gettext as _
 from le_utils.constants import content_kinds
 from le_utils.constants import format_presets
 

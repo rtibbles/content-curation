@@ -12,7 +12,6 @@ from django.conf import settings
 from django.contrib.auth.base_user import AbstractBaseUser
 from django.contrib.auth.base_user import BaseUserManager
 from django.contrib.auth.models import PermissionsMixin
-from django.contrib.postgres.fields import JSONField
 from django.core.cache import cache
 from django.core.exceptions import MultipleObjectsReturned
 from django.core.exceptions import ObjectDoesNotExist
@@ -27,6 +26,7 @@ from django.db import models
 from django.db.models import Count
 from django.db.models import Exists
 from django.db.models import IntegerField
+from django.db.models import JSONField
 from django.db.models import Max
 from django.db.models import OuterRef
 from django.db.models import Q
@@ -37,7 +37,7 @@ from django.db.models.functions import Cast
 from django.db.models.query_utils import DeferredAttribute
 from django.dispatch import receiver
 from django.utils import timezone
-from django.utils.translation import ugettext as _
+from django.utils.translation import gettext as _
 from django_cte import With
 from le_utils import proquint
 from le_utils.constants import content_kinds

@@ -11,7 +11,7 @@ from django.core.cache import cache
 from django.core.mail import EmailMessage
 from django.db import IntegrityError
 from django.template.loader import render_to_string
-from django.utils.translation import ugettext as _
+from django.utils.translation import gettext as _
 
 from contentcuration.models import Channel
 from contentcuration.models import ContentNode

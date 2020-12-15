@@ -276,16 +276,16 @@ LOCALE_PATHS = (
 )
 
 
-def ugettext(s):
+def gettext(s):
     return s
 
 
 LANGUAGES = (
-    ('en', ugettext('English')),
-    ('es-es', ugettext('Spanish')),
-    ('ar', ugettext('Arabic')),
-    ('fr-fr', ugettext('French')),
-    # ('en-PT', ugettext('English - Pirate')),
+    ('en', gettext('English')),
+    ('es-es', gettext('Spanish')),
+    ('ar', gettext('Arabic')),
+    ('fr-fr', gettext('French')),
+    # ('en-PT', gettext('English - Pirate')),
 )
 
 

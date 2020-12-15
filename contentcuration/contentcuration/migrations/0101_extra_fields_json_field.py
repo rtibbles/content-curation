@@ -3,11 +3,10 @@
 from __future__ import unicode_literals
 
 import django.contrib.postgres.fields.jsonb
-from django.db import connection
 from django.db import migrations
-from django.db.models import TextField
 
 from contentcuration.models import ContentNode
+
 
 class Migration(migrations.Migration):
 

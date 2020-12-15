@@ -5,6 +5,7 @@
 #    pip-compile requirements.in
 #
 amqp==2.6.1               # via kombu
+asgiref==3.3.1            # via django
 backoff==1.10.0           # via -r requirements.in
 backports-abc==0.5        # via -r requirements.in
 billiard==3.6.3.0         # via celery
@@ -32,7 +33,7 @@ django-redis==4.12.1      # via -r requirements.in
 django-registration==3.1.1  # via -r requirements.in
 django-s3-storage==0.13.4  # via -r requirements.in
 django-webpack-loader==0.7.0  # via -r requirements.in
-django==2.2.17            # via -r requirements.in, django-bulk-update, django-db-readonly, django-filter, django-js-reverse, django-model-utils, django-mptt, django-redis, django-registration, django-s3-storage, djangorestframework, jsonfield
+django==3.1.4             # via -r requirements.in, django-bulk-update, django-db-readonly, django-filter, django-js-reverse, django-model-utils, django-mptt, django-redis, django-registration, django-s3-storage, djangorestframework, jsonfield
 djangorestframework==3.12.1  # via -r requirements.in
 future==0.18.2            # via -r requirements.in
 google-api-core[grpc]==1.23.0  # via google-api-python-client, google-cloud-core, google-cloud-error-reporting, google-cloud-kms, google-cloud-logging
@@ -57,7 +58,7 @@ httplib2==0.18.1          # via django-postmark, google-api-python-client, googl
 idna==2.10                # via requests
 importlib-metadata==3.1.1  # via kombu
 jmespath==0.10.0          # via boto3, botocore
-jsonfield==2.0.2          # via -r requirements.in
+jsonfield==3.1.0          # via -r requirements.in
 kombu==4.6.11             # via celery
 le-utils==0.1.26          # via -r requirements.in
 libcst==0.3.15            # via google-cloud-error-reporting
